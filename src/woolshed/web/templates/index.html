@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WoolShed – Wool Value-Chain Optimiser</title>
+
+  <!-- Leaflet styles -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Bootstrap styles -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- App styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-dark bg-dark px-3">
+    <span class="navbar-brand mb-0 h1">
+      🐑 WoolShed – Wool Value-Chain Optimiser
+    </span>
+    <div class="d-flex gap-2">
+      <button id="btn-sample" class="btn btn-outline-light btn-sm" title="Load built-in sample data">
+        Load Sample Data
+      </button>
+      <button id="btn-download-sample" class="btn btn-outline-light btn-sm" title="Download sample Excel template">
+        ⬇ Download Template
+      </button>
+      <label class="btn btn-outline-success btn-sm mb-0">
+        📂 Upload Excel
+        <input id="file-upload" type="file" accept=".xlsx,.xls" hidden />
+      </label>
+    </div>
+  </nav>
+
+  <!-- Main layout -->
+  <div class="container-fluid main-container">
+    <div class="row h-100">
+
+      <!-- Sidebar with controls and data tables -->
+      <div id="sidebar" class="col-md-4 col-lg-3 sidebar">
+        <!-- Optimiser controls -->
+        <div class="card mb-2">
+          <div class="card-body p-2">
+            <h6 class="card-title mb-1">Optimisation</h6>
+            <div class="d-flex gap-1 mb-1">
+              <select id="sel-objective" class="form-select form-select-sm">
+                <option value="max_profit">Maximise Profit</option>
+                <option value="min_cost">Minimise Cost</option>
+                <option value="min_impact">Minimise Impact</option>
+              </select>
+              <button id="btn-optimize" class="btn btn-primary btn-sm text-nowrap">
+                ▶ Optimise
+              </button>
+            </div>
+            <div id="opt-status" class="small text-muted">No data loaded.</div>
+          </div>
+        </div>
+
+        <!-- Data tabs -->
+        <ul class="nav nav-tabs nav-fill small" id="dataTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-sources" data-bs-toggle="tab"
+                    data-bs-target="#pane-sources" type="button" role="tab">Sources</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-processes" data-bs-toggle="tab"
+                    data-bs-target="#pane-processes" type="button" role="tab">Processes</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-products" data-bs-toggle="tab"
+                    data-bs-target="#pane-products" type="button" role="tab">Products</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-results" data-bs-toggle="tab"
+                    data-bs-target="#pane-results" type="button" role="tab">Results</button>
+          </li>
+        </ul>
+        <div class="tab-content flex-grow-1 overflow-auto" id="dataTabContent">
+          <div class="tab-pane fade show active p-2" id="pane-sources" role="tabpanel">
+            <div id="tbl-sources" class="table-responsive small"></div>
+          </div>
+          <div class="tab-pane fade p-2" id="pane-processes" role="tabpanel">
+            <div id="tbl-processes" class="table-responsive small"></div>
+          </div>
+          <div class="tab-pane fade p-2" id="pane-products" role="tabpanel">
+            <div id="tbl-products" class="table-responsive small"></div>
+          </div>
+          <div class="tab-pane fade p-2" id="pane-results" role="tabpanel">
+            <pre id="results-text" class="small mb-0" style="white-space:pre-wrap">Run the optimiser to see results.</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map -->
+      <div class="col-md-8 col-lg-9 p-0">
+        <div id="map"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map legend -->
+  <div id="legend">
+    <b>Legend</b><br/>
+    <span class="legend-dot" style="background:#2196F3"></span> Wool Source<br/>
+    <span class="legend-dot" style="background:#FF9800"></span> Process<br/>
+    <span class="legend-dot" style="background:#4CAF50"></span> Product<br/>
+    <span class="legend-line"></span> Optimised Flow
+  </div>
+
+  <!-- Toast notifications -->
+  <div class="position-fixed top-0 end-0 p-3" style="z-index:1080;">
+    <div id="toast-wrap"></div>
+  </div>
+
+  <!-- Leaflet script -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Bootstrap script -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- App script -->
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

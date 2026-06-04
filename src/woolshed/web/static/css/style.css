@@ -1,0 +1,99 @@
+/* Main WoolShed styles. */
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.main-container {
+  height: calc(100vh - 56px);   /* Space below the navbar. */
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: #f8f9fa;
+  border-right: 1px solid #dee2e6;
+  padding: 0.5rem;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+/* Data tables. */
+.tab-content {
+  min-height: 0;
+}
+
+.table-responsive {
+  max-height: 100%;
+}
+
+.table-responsive table {
+  font-size: 0.78rem;
+}
+
+.table-responsive th {
+  position: sticky;
+  top: 0;
+  background: #e9ecef;
+  z-index: 1;
+}
+
+/* Map legend. */
+#legend {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(255,255,255,0.92);
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.25);
+  z-index: 1000;
+  line-height: 1.7;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 24px;
+  height: 3px;
+  background: #e53935;
+  margin-right: 4px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+
+/* Sidebar scrollbar. */
+.sidebar ::-webkit-scrollbar { width: 6px; }
+.sidebar ::-webkit-scrollbar-thumb { background: #adb5bd; border-radius: 3px; }
+
+/* Loading spinner. */
+.spinner-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.spinner-overlay .spinner-border {
+  width: 3rem;
+  height: 3rem;
+}
