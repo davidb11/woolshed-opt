@@ -17,9 +17,46 @@ html, body {
   height: 100%;
   overflow: hidden;
   background: #f8f9fa;
-  border-right: 1px solid #dee2e6;
   padding: 0.5rem;
+  min-width: 0;
 }
+
+/* Drag-resize edge. */
+#sidebar-edge {
+  width: 5px;
+  background: #dee2e6;
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  transition: background 0.15s;
+  z-index: 1000;
+}
+#sidebar-edge:hover { background: #adb5bd; }
+
+#sidebar-toggle-btn {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 48px;
+  background: #6c757d;
+  border: none;
+  border-radius: 0 6px 6px 0;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+  line-height: 1;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.2);
+}
+#sidebar-toggle-btn:hover { background: #495057; }
 
 #map {
   width: 100%;
@@ -77,6 +114,52 @@ html, body {
   margin-right: 4px;
   vertical-align: middle;
   border-radius: 2px;
+}
+
+/* Inline table editing. */
+.tbl-edit {
+  cursor: text;
+  outline: none;
+  min-width: 2ch;
+}
+.tbl-edit:hover {
+  background: rgba(13, 110, 253, 0.06);
+}
+.tbl-edit:focus {
+  background: #fff !important;
+  box-shadow: inset 0 0 0 2px #0d6efd;
+  border-radius: 2px;
+}
+.tbl-edit-saved {
+  background: #d4edda !important;
+  transition: background 0.8s ease-out;
+}
+.tbl-edit-error {
+  background: #f8d7da !important;
+}
+
+/* Quality class dropdowns. */
+.tbl-quality-select {
+  font-size: 0.72rem;
+  padding: 0 2px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  max-width: 72px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.tbl-quality-select:hover {
+  border-color: #adb5bd;
+  background: #fff;
+}
+.tbl-quality-select:focus {
+  outline: none;
+  border-color: #0d6efd;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(13,110,253,0.2);
 }
 
 /* Sidebar scrollbar. */

@@ -180,6 +180,71 @@ def create_app() -> Flask:
             tmp.name, as_attachment=True, download_name="woolshed_sample_input.xlsx"
         )
 
+    # Entity patch API.
+
+    @app.route("/api/entity", methods=["PATCH"])
+    def api_patch_entity():
+        body = request.get_json(silent=True) or {}
+        entity_type = body.get("type")
+        entity_id   = body.get("id")
+        field       = body.get("field")
+        value       = body.get("value")
+
+        if not all([entity_type, entity_id, field]) or value is None:
+            return jsonify(error="Missing type, id, field, or value"), 400
+
+        lists = {
+            "source":  _state["sources"],
+            "process": _state["processes"],
+            "product": _state["products"],
+        }
+        if entity_type not in lists:
+            return jsonify(error=f"Unknown entity type: {entity_type}"), 400
+
+        entity = next((e for e in lists[entity_type] if e.id == entity_id), None)
+        if entity is None:
+            return jsonify(error=f"{entity_type} '{entity_id}' not found"), 404
+
+        numeric_fields = {
+            "lat", "lon", "quantity_kg", "cost_per_kg", "impact_per_kg",
+            "conversion_pct", "max_capacity_kg",
+            "demand_min_kg", "demand_max_kg", "price_per_kg",
+        }
+        string_fields = {"name"}
+        quality_fields = {"quality.fineness", "quality.color", "quality.staple_length", "quality.scouring_yield"}
+        quality_ranges = {
+            "fineness": (1, 5), "color": (1, 6), "staple_length": (1, 5), "scouring_yield": (1, 5),
+        }
+
+        if field in quality_fields:
+            sub = field.split(".")[1]
+            lo, hi = quality_ranges[sub]
+            if value == "" or value is None:
+                setattr(entity.quality, sub, None)
+            else:
+                try:
+                    iv = int(value)
+                except (TypeError, ValueError):
+                    return jsonify(error=f"Expected an integer class for '{sub}'"), 400
+                if not (lo <= iv <= hi):
+                    return jsonify(error=f"'{sub}' must be between {lo} and {hi}"), 400
+                setattr(entity.quality, sub, iv)
+        elif field in numeric_fields:
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                return jsonify(error=f"Expected a number for '{field}'"), 400
+            setattr(entity, field, value)
+        elif field in string_fields:
+            value = str(value).strip()
+            if not value:
+                return jsonify(error="Name cannot be empty"), 400
+            setattr(entity, field, value)
+        else:
+            return jsonify(error=f"Field '{field}' is not editable"), 400
+
+        return jsonify(ok=True)
+
     # Optimisation API.
 
     @app.route("/api/optimize", methods=["POST"])
