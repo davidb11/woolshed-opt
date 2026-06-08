@@ -33,7 +33,7 @@ def main() -> None:
     if args.browser:
         threading.Timer(1.5, webbrowser.open, args=[url]).start()
 
-    print(f"\n  🐑  WoolShed is running at {url}\n")
+    print(f"\n  WoolShed is running at {url}\n")
     app.run(host=args.host, port=args.port, debug=args.debug)
 
 
