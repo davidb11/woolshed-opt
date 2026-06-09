@@ -166,6 +166,16 @@ html, body {
 .sidebar ::-webkit-scrollbar { width: 6px; }
 .sidebar ::-webkit-scrollbar-thumb { background: #adb5bd; border-radius: 3px; }
 
+/* Flow results table. */
+#flow-table .table { font-size: 0.78rem; }
+#flow-table thead th {
+  position: sticky;
+  top: 0;
+  background: #e9ecef;
+  z-index: 1;
+}
+.flow-row.flow-highlight { background: rgba(255, 111, 0, 0.12) !important; }
+
 /* Loading spinner. */
 .spinner-overlay {
   position: fixed;
