@@ -213,7 +213,9 @@ function makeTable(rows, entityType, columns) {
   columns.forEach(c => { h += `<th>${c.label}</th>`; });
   h += "</tr></thead><tbody>";
   rows.forEach(r => {
-    const safeId = (r.id || "").replace(/'/g, "\\'");
+    const id = String(r.id || "");
+    const safeId = id.replace(/['\\]/g, "\\$&");
+    const safeIdAttr = id.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     h += `<tr onclick="focusOn('${safeId}')" style="cursor:pointer">`;
     columns.forEach(c => {
       let v = c.get(r);
@@ -223,7 +225,7 @@ function makeTable(rows, entityType, columns) {
         const opts = QUALITY[c.qualityKey] || {};
         const shortLabel = lbl => lbl.split(" (")[0];
         let sel = `<select class="tbl-quality-select" ` +
-                  `data-entity-type="${entityType}" data-id="${safeId}" data-field="quality.${c.qualityKey}" ` +
+                  `data-entity-type="${entityType}" data-id="${safeIdAttr}" data-field="quality.${c.qualityKey}" ` +
                   `onclick="event.stopPropagation()">` +
                   `<option value="">—</option>`;
         Object.entries(opts).forEach(([k, label]) => {
@@ -234,7 +236,7 @@ function makeTable(rows, entityType, columns) {
       } else if (c.editable) {
         const safeVal = String(v).replace(/"/g, "&quot;").replace(/</g, "&lt;");
         h += `<td class="tbl-edit" contenteditable="true" ` +
-             `data-entity-type="${entityType}" data-id="${safeId}" data-field="${c.field}" ` +
+             `data-entity-type="${entityType}" data-id="${safeIdAttr}" data-field="${c.field}" ` +
              `onclick="event.stopPropagation()" ` +
              `onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}` +
                         `if(event.key==='Escape'){this.textContent=this.dataset.orig;this.blur()}" ` +
