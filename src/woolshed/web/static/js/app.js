@@ -264,8 +264,14 @@ async function patchEntity(type, id, field, value) {
   const lists = { source: DATA.sources, process: DATA.processes, product: DATA.products };
   const entity = (lists[type] || []).find(e => e.id === id);
   if (entity) {
+    if (field.startsWith("quality.")) {
+      const sub = field.split(".")[1];
+      entity.quality = entity.quality || {};
+      entity.quality[sub] = value === "" ? null : parseInt(value, 10);
+      return;
+    }
     const parsed = parseFloat(value);
-    entity[field] = isNaN(parsed) ? value : parsed;
+    entity[field] = Number.isFinite(parsed) ? parsed : value;
     // If lat/lon changed, redraw markers and decorations.
     if (field === "lat" || field === "lon") {
       LOCATIONS[id] = [
