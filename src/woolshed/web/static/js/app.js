@@ -28,7 +28,8 @@ try {
 const sourceLayer = L.layerGroup().addTo(map);
 const techLayer = L.layerGroup().addTo(map);
 const productLayer = L.layerGroup().addTo(map);
-const flowLayer = L.layerGroup().addTo(map);
+const flowLayer   = L.layerGroup().addTo(map);
+const jitterLayer = L.layerGroup().addTo(map); // connector legs for co-located markers
 // Marker lookup for table clicks.
 let LOC_MARKERS = {};
 
@@ -142,12 +143,36 @@ function drawMarkers() {
   techLayer.clearLayers();
   productLayer.clearLayers();
   flowLayer.clearLayers();
+  jitterLayer.clearLayers();
   LOC_MARKERS = {};
+
+  // Group entities by coordinate; co-located ones get a small circular offset
+  // so each marker is individually clickable. LOCATIONS keeps true coords.
+  const _coordGroups = {};
+  [...DATA.sources, ...DATA.processes, ...DATA.products].forEach(e => {
+    const key = `${(+e.lat).toFixed(5)},${(+e.lon).toFixed(5)}`;
+    (_coordGroups[key] = _coordGroups[key] || []).push(e.id);
+  });
+  function _jittered(e) {
+    const key = `${(+e.lat).toFixed(5)},${(+e.lon).toFixed(5)}`;
+    const group = _coordGroups[key];
+    if (group.length === 1) return [e.lat, e.lon];
+    const idx   = group.indexOf(e.id);
+    const angle = (2 * Math.PI * idx) / group.length - Math.PI / 2;
+    const r     = 0.0018; // ~200 m at mid-latitudes
+    const jll   = [e.lat + r * Math.cos(angle), e.lon + r * Math.sin(angle)];
+    L.polyline([[e.lat, e.lon], jll], {
+      color: "#888", weight: 1, opacity: 0.55, dashArray: "3 4", pane: "flowPane",
+      interactive: false,
+    }).addTo(jitterLayer);
+    LOCATIONS[e.id] = jll; // flow lines follow the marker, not the true centre
+    return jll;
+  }
 
   const bounds = [];
 
   DATA.sources.forEach(s => {
-    const ll = [s.lat, s.lon];
+    const ll = _jittered(s);
     bounds.push(ll);
     const m = L.marker(ll, { icon: ICONS.source })
       .bindPopup(
@@ -161,7 +186,7 @@ function drawMarkers() {
   });
 
   DATA.processes.forEach(t => {
-    const ll = [t.lat, t.lon];
+    const ll = _jittered(t);
     bounds.push(ll);
     const m = L.marker(ll, { icon: techIcon(t.stage) })
       .bindPopup(
@@ -175,7 +200,7 @@ function drawMarkers() {
   });
 
   DATA.products.forEach(p => {
-    const ll = [p.lat, p.lon];
+    const ll = _jittered(p);
     bounds.push(ll);
     const m = L.marker(ll, { icon: ICONS.product })
       .bindPopup(
@@ -461,11 +486,6 @@ function _renderDecorations() {
   decorLayer.clearLayers();
   if (!_flows.length) return;
 
-  // Count how many flows share each destination so we can stagger arrows.
-  const destCount = {};
-  const destIdx   = {};
-  _flows.forEach(f => { destCount[f.to_id] = (destCount[f.to_id] || 0) + 1; });
-
   _flows.forEach(f => {
     const from = LOCATIONS[f.from_id];
     const to   = LOCATIONS[f.to_id];
@@ -486,14 +506,9 @@ function _renderDecorations() {
     const perpY =  dx / len;
     const labelOffset = 22;
 
-    // Stagger arrows for flows sharing the same destination (spread 58%–74%).
-    const nDest = destCount[f.to_id] || 1;
-    const iDest = destIdx[f.to_id] = (destIdx[f.to_id] ?? -1) + 1;
-    const arrowT = nDest === 1 ? 0.72 : 0.58 + (iDest / (nDest - 1)) * 0.16;
-
     const arrowLL = map.containerPointToLatLng(L.point(
-      fromPx.x + dx * arrowT,
-      fromPx.y + dy * arrowT
+      fromPx.x + dx * 0.5,
+      fromPx.y + dy * 0.5
     ));
     L.marker(arrowLL, {
       icon: L.divIcon({
