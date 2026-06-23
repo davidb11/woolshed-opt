@@ -28,7 +28,8 @@ try {
 const sourceLayer = L.layerGroup().addTo(map);
 const techLayer = L.layerGroup().addTo(map);
 const productLayer = L.layerGroup().addTo(map);
-const flowLayer = L.layerGroup().addTo(map);
+const flowLayer   = L.layerGroup().addTo(map);
+const jitterLayer = L.layerGroup().addTo(map); // connector legs for co-located markers
 // Marker lookup for table clicks.
 let LOC_MARKERS = {};
 
@@ -146,10 +147,33 @@ function drawMarkers() {
   _flows = [];
   LOC_MARKERS = {};
 
+  // Group entities by coordinate; co-located ones get a small circular offset
+  // so each marker is individually clickable. LOCATIONS keeps true coords.
+  const _coordGroups = {};
+  [...DATA.sources, ...DATA.processes, ...DATA.products].forEach(e => {
+    const key = `${(+e.lat).toFixed(5)},${(+e.lon).toFixed(5)}`;
+    (_coordGroups[key] = _coordGroups[key] || []).push(e.id);
+  });
+  function _jittered(e) {
+    const key = `${(+e.lat).toFixed(5)},${(+e.lon).toFixed(5)}`;
+    const group = _coordGroups[key];
+    if (group.length === 1) return [e.lat, e.lon];
+    const idx   = group.indexOf(e.id);
+    const angle = (2 * Math.PI * idx) / group.length - Math.PI / 2;
+    const r     = 0.0018; // ~200 m at mid-latitudes
+    const jll   = [e.lat + r * Math.cos(angle), e.lon + r * Math.sin(angle)];
+    L.polyline([[e.lat, e.lon], jll], {
+      color: "#888", weight: 1, opacity: 0.55, dashArray: "3 4", pane: "flowPane",
+      interactive: false,
+    }).addTo(jitterLayer);
+    LOCATIONS[e.id] = jll; // flow lines follow the marker, not the true centre
+    return jll;
+  }
+
   const bounds = [];
 
   DATA.sources.forEach(s => {
-    const ll = [s.lat, s.lon];
+    const ll = _jittered(s);
     bounds.push(ll);
     const m = L.marker(ll, { icon: ICONS.source })
       .bindPopup(
@@ -163,7 +187,7 @@ function drawMarkers() {
   });
 
   DATA.processes.forEach(t => {
-    const ll = [t.lat, t.lon];
+    const ll = _jittered(t);
     bounds.push(ll);
     const m = L.marker(ll, { icon: techIcon(t.stage) })
       .bindPopup(
@@ -177,7 +201,7 @@ function drawMarkers() {
   });
 
   DATA.products.forEach(p => {
-    const ll = [p.lat, p.lon];
+    const ll = _jittered(p);
     bounds.push(ll);
     const m = L.marker(ll, { icon: ICONS.product })
       .bindPopup(
@@ -328,6 +352,31 @@ document.addEventListener("focusout", async (e) => {
   }
 });
 
+// Delegated hover + click handlers for flow table rows.
+document.addEventListener("mouseover", (e) => {
+  const row = e.target.closest(".flow-row");
+  if (!row) return;
+  const idx = parseInt(row.dataset.idx, 10);
+  _highlightFlow(idx, true);
+});
+document.addEventListener("mouseout", (e) => {
+  const row = e.target.closest(".flow-row");
+  if (!row) return;
+  _highlightFlow(parseInt(row.dataset.idx, 10), false);
+});
+document.addEventListener("click", (e) => {
+  const row = e.target.closest(".flow-row");
+  if (!row) return;
+  const idx = parseInt(row.dataset.idx, 10);
+  const f   = _flows[idx];
+  const pl  = _flowLines[idx];
+  if (!f || !pl) return;
+  const from = LOCATIONS[f.from_id];
+  const to   = LOCATIONS[f.to_id];
+  if (from && to) map.fitBounds([from, to], { padding: [60, 60] });
+  pl.openPopup();
+});
+
 function drawTables() {
   document.getElementById("tbl-sources").innerHTML = makeTable(DATA.sources, "source", [
     { label: "ID",      get: r => r.id },
@@ -364,26 +413,81 @@ function drawTables() {
 // Flow lines.
 
 let _flows = [];
+let _flowLines = []; // parallel array of Leaflet polylines
 const decorLayer = L.layerGroup().addTo(map);
+
+function _entityName(id) {
+  return (
+    DATA.sources.find(e => e.id === id) ||
+    DATA.processes.find(e => e.id === id) ||
+    DATA.products.find(e => e.id === id)
+  )?.name || id;
+}
+
+function _highlightFlow(idx, on) {
+  _flowLines.forEach((pl, i) => {
+    if (!pl) return;
+    if (i === idx) pl.setStyle({ color: on ? "#ff6f00" : "#e53935", weight: on ? pl._woolWeight + 2 : pl._woolWeight, opacity: 0.9 });
+    else pl.setStyle({ opacity: on ? 0.3 : 0.75, color: "#e53935", weight: pl._woolWeight });
+  });
+  const row = document.querySelector(`.flow-row[data-idx="${idx}"]`);
+  if (row) row.classList.toggle("flow-highlight", on);
+}
 
 function drawFlows(flows) {
   _flows = flows || [];
+  _flowLines = [];
   flowLayer.clearLayers();
   decorLayer.clearLayers();
-  if (!_flows.length) return;
+
+  const ftEl = document.getElementById("flow-table");
+  const rtEl = document.getElementById("results-text");
+
+  if (!_flows.length) {
+    if (ftEl) ftEl.innerHTML = "";
+    return;
+  }
 
   const maxMass = Math.max(..._flows.map(f => f.mass_kg), 1);
-  _flows.forEach(f => {
+  const totalMass = _flows.reduce((s, f) => s + f.mass_kg, 0);
+
+  _flows.forEach((f, idx) => {
     const from = LOCATIONS[f.from_id];
     const to   = LOCATIONS[f.to_id];
-    if (!from || !to) return;
+    if (!from || !to) { _flowLines.push(null); return; }
     const weight = Math.max(2, Math.min(10, (f.mass_kg / maxMass) * 10));
-    L.polyline([from, to], {
+    const fromName = _entityName(f.from_id);
+    const toName   = _entityName(f.to_id);
+    const pl = L.polyline([from, to], {
       color: "#e53935", weight, opacity: 0.75, pane: 'flowPane',
-    }).bindPopup(`<b>${f.from_id} → ${f.to_id}</b><br>${f.mass_kg.toFixed(1)} kg`)
-      .addTo(flowLayer);
+    }).bindPopup(
+      `<b>${fromName}</b><br>↓ ${f.mass_kg.toFixed(1)} kg<br><b>${toName}</b>`
+    ).addTo(flowLayer);
+    pl._woolWeight = weight;
+    pl._woolIdx   = idx;
+    pl.on("mouseover", () => _highlightFlow(idx, true));
+    pl.on("mouseout",  () => _highlightFlow(idx, false));
+    _flowLines.push(pl);
   });
 
+  // Build flow table in Results tab.
+  if (ftEl) {
+    let h = `<table class="table table-sm table-hover table-bordered mb-0">
+      <thead><tr>
+        <th>From</th><th>To</th><th class="text-end">kg</th><th class="text-end">%</th>
+      </tr></thead><tbody>`;
+    _flows.forEach((f, idx) => {
+      const pct = (f.mass_kg / totalMass * 100).toFixed(1);
+      h += `<tr class="flow-row" data-idx="${idx}" style="cursor:pointer">
+        <td>${_entityName(f.from_id)}</td>
+        <td>${_entityName(f.to_id)}</td>
+        <td class="text-end">${f.mass_kg.toFixed(0)}</td>
+        <td class="text-end">${pct}%</td>
+      </tr>`;
+    });
+    h += "</tbody></table>";
+    ftEl.innerHTML = h;
+  }
   _renderDecorations();
 }
 
@@ -401,25 +505,21 @@ function _renderDecorations() {
     const toPx   = map.latLngToContainerPoint(L.latLng(to[0],   to[1]));
     const angle  = Math.atan2(toPx.x - fromPx.x, fromPx.y - toPx.y) * 180 / Math.PI;
 
-    const midLL = map.containerPointToLatLng(
-      L.point((fromPx.x + toPx.x) / 2, (fromPx.y + toPx.y) / 2)
-    );
-    L.marker(midLL, {
-      icon: L.divIcon({
-        className: "",
-        html: `<span style="background:rgba(255,255,255,0.85);padding:1px 5px;border-radius:3px;
-               font-size:11px;font-weight:600;color:#c62828;white-space:nowrap;
-               border:1px solid #ef9a9a">${f.mass_kg.toFixed(0)} kg</span>`,
-        iconSize: [60, 18],
-        iconAnchor: [30, 9],
-      }),
-      pane: 'flowPane',
-    }).addTo(decorLayer);
+    const dx = toPx.x - fromPx.x;
+    const dy = toPx.y - fromPx.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
 
-    const arrowLL = map.containerPointToLatLng(
-      L.point(fromPx.x + (toPx.x - fromPx.x) * 0.82,
-              fromPx.y + (toPx.y - fromPx.y) * 0.82)
-    );
+    // Unit perpendicular — always left of travel direction.
+    // Each flow from a different direction gets a different perpendicular,
+    // so labels naturally spread around convergence nodes.
+    const perpX = -dy / len;
+    const perpY =  dx / len;
+    const labelOffset = 22;
+
+    const arrowLL = map.containerPointToLatLng(L.point(
+      fromPx.x + dx * 0.5,
+      fromPx.y + dy * 0.5
+    ));
     L.marker(arrowLL, {
       icon: L.divIcon({
         className: "",
