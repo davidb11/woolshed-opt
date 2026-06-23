@@ -142,6 +142,8 @@ function drawMarkers() {
   techLayer.clearLayers();
   productLayer.clearLayers();
   flowLayer.clearLayers();
+  decorLayer.clearLayers();
+  _flows = [];
   LOC_MARKERS = {};
 
   const bounds = [];
@@ -258,31 +260,48 @@ function drawTables() {
 
 // Flow lines.
 
+let _flows = [];
+const decorLayer = L.layerGroup().addTo(map);
+
 function drawFlows(flows) {
+  _flows = flows || [];
   flowLayer.clearLayers();
-  if (!flows || !flows.length) return;
+  decorLayer.clearLayers();
+  if (!_flows.length) return;
 
-  // Scale line width against the largest flow.
-  const maxMass = Math.max(...flows.map(f => f.mass_kg), 1);
-
-  flows.forEach(f => {
+  const maxMass = Math.max(..._flows.map(f => f.mass_kg), 1);
+  _flows.forEach(f => {
     const from = LOCATIONS[f.from_id];
-    const to = LOCATIONS[f.to_id];
+    const to   = LOCATIONS[f.to_id];
+    if (!from || !to) return;
+    const weight = Math.max(2, Math.min(10, (f.mass_kg / maxMass) * 10));
+    L.polyline([from, to], {
+      color: "#e53935", weight, opacity: 0.75, pane: 'flowPane',
+    }).bindPopup(`<b>${f.from_id} → ${f.to_id}</b><br>${f.mass_kg.toFixed(1)} kg`)
+      .addTo(flowLayer);
+  });
+
+  _renderDecorations();
+}
+
+// Redrawn on zoomend so pixel-derived positions stay snapped to the line.
+function _renderDecorations() {
+  decorLayer.clearLayers();
+  if (!_flows.length) return;
+
+  _flows.forEach(f => {
+    const from = LOCATIONS[f.from_id];
+    const to   = LOCATIONS[f.to_id];
     if (!from || !to) return;
 
-    const weight = Math.max(2, Math.min(10, (f.mass_kg / maxMass) * 10));
+    const fromPx = map.latLngToContainerPoint(L.latLng(from[0], from[1]));
+    const toPx   = map.latLngToContainerPoint(L.latLng(to[0],   to[1]));
+    const angle  = Math.atan2(toPx.x - fromPx.x, fromPx.y - toPx.y) * 180 / Math.PI;
 
-    const line = L.polyline([from, to], {
-      color: "#e53935",
-      weight: weight,
-      opacity: 0.75,
-      dashArray: null,
-      pane: 'flowPane',
-    }).addTo(flowLayer);
-
-    // Label the midpoint.
-    const mid = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2];
-    L.marker(mid, {
+    const midLL = map.containerPointToLatLng(
+      L.point((fromPx.x + toPx.x) / 2, (fromPx.y + toPx.y) / 2)
+    );
+    L.marker(midLL, {
       icon: L.divIcon({
         className: "",
         html: `<span style="background:rgba(255,255,255,0.85);padding:1px 5px;border-radius:3px;
@@ -292,35 +311,32 @@ function drawFlows(flows) {
         iconAnchor: [30, 9],
       }),
       pane: 'flowPane',
-    }).addTo(flowLayer);
+    }).addTo(decorLayer);
 
-    // Put a small arrow near the destination.
-    const ratio = 0.85;
-    const arrowLat = from[0] + (to[0] - from[0]) * ratio;
-    const arrowLon = from[1] + (to[1] - from[1]) * ratio;
-    L.marker([arrowLat, arrowLon], {
+    const arrowLL = map.containerPointToLatLng(
+      L.point(fromPx.x + (toPx.x - fromPx.x) * 0.82,
+              fromPx.y + (toPx.y - fromPx.y) * 0.82)
+    );
+    L.marker(arrowLL, {
       icon: L.divIcon({
         className: "",
-        html: `<svg width="16" height="16" style="transform:rotate(${
-          Math.atan2(to[1]-from[1], to[0]-from[0]) * 180/Math.PI - 90
-        }deg)"><polygon points="8,0 16,16 0,16" fill="#e53935" opacity="0.8"/></svg>`,
+        html: `<svg width="16" height="16" style="transform:rotate(${angle}deg)">` +
+              `<polygon points="8,0 16,16 0,16" fill="#e53935" opacity="0.85"/></svg>`,
         iconSize: [16, 16],
         iconAnchor: [8, 8],
       }),
       pane: 'flowPane',
-    }).addTo(flowLayer);
-
-    line.bindPopup(`<b>${f.from_id} → ${f.to_id}</b><br>${f.mass_kg.toFixed(1)} kg`);
+    }).addTo(decorLayer);
   });
-    // Keep markers visible above flow lines.
-    try {
-      sourceLayer.bringToFront();
-      techLayer.bringToFront();
-      productLayer.bringToFront();
-    } catch (e) {
-      // Some Leaflet builds may not support bringToFront.
-    }
+
+  try {
+    sourceLayer.bringToFront();
+    techLayer.bringToFront();
+    productLayer.bringToFront();
+  } catch (e) {}
 }
+
+map.on('zoomend', _renderDecorations);
 
 // Event handlers.
 
