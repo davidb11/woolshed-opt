@@ -293,11 +293,7 @@ document.addEventListener("change", async (e) => {
   try {
     await patchEntity(entityType, id, field, sel.value);
     if (td) { td.classList.add("tbl-edit-saved"); setTimeout(() => td.classList.remove("tbl-edit-saved"), 900); }
-    // Keep local DATA in sync.
-    const sub = field.split(".")[1];
-    const lists = { source: DATA.sources, process: DATA.processes, product: DATA.products };
-    const entity = (lists[entityType] || []).find(e2 => e2.id === id);
-    if (entity && entity.quality) entity.quality[sub] = sel.value === "" ? null : parseInt(sel.value, 10);
+    // Local DATA state is updated inside patchEntity().
   } catch (err) {
     if (td) { td.classList.add("tbl-edit-error"); setTimeout(() => td.classList.remove("tbl-edit-error"), 1800); }
     showToast(err.message, "Save error", "danger");
