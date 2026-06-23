@@ -142,6 +142,8 @@ function drawMarkers() {
   techLayer.clearLayers();
   productLayer.clearLayers();
   flowLayer.clearLayers();
+  decorLayer.clearLayers();
+  _flows = [];
   LOC_MARKERS = {};
 
   const bounds = [];
