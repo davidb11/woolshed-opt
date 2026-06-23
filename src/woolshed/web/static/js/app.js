@@ -416,6 +416,10 @@ let _flows = [];
 let _flowLines = []; // parallel array of Leaflet polylines
 const decorLayer = L.layerGroup().addTo(map);
 
+function escHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function _entityName(id) {
   return (
     DATA.sources.find(e => e.id === id) ||
@@ -472,20 +476,22 @@ function drawFlows(flows) {
 
   // Build flow table in Results tab.
   if (ftEl) {
-    let h = `<table class="table table-sm table-hover table-bordered mb-0">
+    let h = `<div class="flow-table-scroll"><table class="table table-sm table-hover table-bordered mb-0">
       <thead><tr>
         <th>From</th><th>To</th><th class="text-end">kg</th><th class="text-end">%</th>
       </tr></thead><tbody>`;
     _flows.forEach((f, idx) => {
-      const pct = (f.mass_kg / totalMass * 100).toFixed(1);
+      const pct = totalMass ? (f.mass_kg / totalMass * 100).toFixed(1) : "0.0";
+      const fromName = escHtml(_entityName(f.from_id));
+      const toName   = escHtml(_entityName(f.to_id));
       h += `<tr class="flow-row" data-idx="${idx}" style="cursor:pointer">
-        <td>${_entityName(f.from_id)}</td>
-        <td>${_entityName(f.to_id)}</td>
+        <td title="${fromName}">${fromName}</td>
+        <td title="${toName}">${toName}</td>
         <td class="text-end">${f.mass_kg.toFixed(0)}</td>
         <td class="text-end">${pct}%</td>
       </tr>`;
     });
-    h += "</tbody></table>";
+    h += "</tbody></table></div>";
     ftEl.innerHTML = h;
   }
   _renderDecorations();
@@ -629,41 +635,23 @@ document.getElementById("btn-optimize").addEventListener("click", async () => {
 
 // Sidebar resize and collapse.
 (function () {
-  const sidebarEl = document.getElementById("sidebar");
-  const edgeEl    = document.getElementById("sidebar-edge");
-  const toggleBtn = document.getElementById("sidebar-toggle-btn");
+  const sidebarEl  = document.getElementById("sidebar");
+  const edgeEl     = document.getElementById("sidebar-edge");
+  const toggleBtn  = document.getElementById("sidebar-toggle-btn");
+  const mobilBtn   = document.getElementById("mobile-panel-btn");
+  const backdrop   = document.getElementById("sidebar-backdrop");
+  const mobileQ    = window.matchMedia("(max-width: 767.98px)");
 
-  let _width     = sidebarEl.offsetWidth || 300;
+  let _width     = sidebarEl.offsetWidth || 500;
   let _resizing  = false;
   let _collapsed = false;
 
-  edgeEl.addEventListener("mousedown", (e) => {
-    if (e.target === toggleBtn) return;
-    _resizing = true;
-    document.body.style.cursor    = "col-resize";
-    document.body.style.userSelect = "none";
-    e.preventDefault();
-  });
+  function isMobile() { return mobileQ.matches; }
 
-  document.addEventListener("mousemove", (e) => {
-    if (!_resizing) return;
-    const left = edgeEl.parentElement.getBoundingClientRect().left;
-    const w = Math.max(500, Math.min(650, e.clientX - left));
-    sidebarEl.style.width = w + "px";
-    _width = w;
-    map.invalidateSize();
-  });
-
-  document.addEventListener("mouseup", () => {
-    if (!_resizing) return;
-    _resizing = false;
-    document.body.style.cursor    = "";
-    document.body.style.userSelect = "";
-  });
-
-  toggleBtn.addEventListener("click", () => {
-    _collapsed = !_collapsed;
-    if (_collapsed) {
+  // Desktop collapse/expand.
+  function desktopCollapse(on) {
+    _collapsed = on;
+    if (on) {
       sidebarEl.style.width    = "0";
       sidebarEl.style.padding  = "0";
       sidebarEl.style.overflow = "hidden";
@@ -677,7 +665,69 @@ document.getElementById("btn-optimize").addEventListener("click", async () => {
       toggleBtn.title          = "Hide panel";
     }
     map.invalidateSize();
+  }
+
+  // Mobile overlay open/close.
+  function mobileOpen(on) {
+    sidebarEl.classList.toggle("sidebar-open", on);
+    backdrop.classList.toggle("active", on);
+    mobilBtn.style.display = on ? "none" : "";
+  }
+
+  // Adapt when breakpoint changes (e.g. window resize / rotation).
+  function onBreakpointChange() {
+    if (isMobile()) {
+      // Reset any desktop inline styles so CSS takes over.
+      sidebarEl.style.width    = "";
+      sidebarEl.style.padding  = "";
+      sidebarEl.style.overflow = "";
+      mobileOpen(false);
+    } else {
+      sidebarEl.classList.remove("sidebar-open");
+      backdrop.classList.remove("active");
+      mobilBtn.style.display = "";
+      // Restore desktop width.
+      if (!_collapsed) sidebarEl.style.width = _width + "px";
+    }
+    map.invalidateSize();
+  }
+  mobileQ.addEventListener("change", onBreakpointChange);
+
+  // Desktop drag resize.
+  edgeEl.addEventListener("mousedown", (e) => {
+    if (e.target === toggleBtn) return;
+    if (isMobile()) return;
+    _resizing = true;
+    document.body.style.cursor     = "col-resize";
+    document.body.style.userSelect = "none";
+    e.preventDefault();
   });
+  document.addEventListener("mousemove", (e) => {
+    if (!_resizing) return;
+    const left = edgeEl.parentElement.getBoundingClientRect().left;
+    const w = Math.max(500, Math.min(650, e.clientX - left));
+    sidebarEl.style.width = w + "px";
+    _width = w;
+    map.invalidateSize();
+  });
+  document.addEventListener("mouseup", () => {
+    if (!_resizing) return;
+    _resizing = false;
+    document.body.style.cursor     = "";
+    document.body.style.userSelect = "";
+  });
+
+  // Desktop toggle button.
+  toggleBtn.addEventListener("click", () => {
+    if (isMobile()) return;
+    desktopCollapse(!_collapsed);
+  });
+
+  // Mobile open button (on map).
+  mobilBtn.addEventListener("click", () => mobileOpen(true));
+
+  // Backdrop closes sidebar on mobile.
+  backdrop.addEventListener("click", () => mobileOpen(false));
 }());
 
 // Start the app.
