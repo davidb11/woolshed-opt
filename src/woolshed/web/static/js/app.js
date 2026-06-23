@@ -234,7 +234,11 @@ function makeTable(rows, entityType, columns) {
         sel += `</select>`;
         h += `<td style="padding:1px 2px">${sel}</td>`;
       } else if (c.editable) {
-        const safeVal = String(v).replace(/"/g, "&quot;").replace(/</g, "&lt;");
+        const safeVal = String(v)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;");
         h += `<td class="tbl-edit" contenteditable="true" ` +
              `data-entity-type="${entityType}" data-id="${safeIdAttr}" data-field="${c.field}" ` +
              `onclick="event.stopPropagation()" ` +
