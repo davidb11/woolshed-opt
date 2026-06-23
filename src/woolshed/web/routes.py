@@ -217,11 +217,15 @@ def create_app() -> Flask:
         }
 
         if field in quality_fields:
+            if not hasattr(entity, "quality") or entity.quality is None:
+                return (
+                    jsonify(error=f"Field '{field}' is not editable for entity type '{entity_type}'"),
+                    400,
+                )
             sub = field.split(".")[1]
             lo, hi = quality_ranges[sub]
             if value == "" or value is None:
                 setattr(entity.quality, sub, None)
-            else:
                 try:
                     iv = int(value)
                 except (TypeError, ValueError):
