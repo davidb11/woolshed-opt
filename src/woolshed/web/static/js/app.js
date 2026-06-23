@@ -240,7 +240,8 @@ function makeTable(rows, entityType, columns) {
                         `if(event.key==='Escape'){this.textContent=this.dataset.orig;this.blur()}" ` +
              `onfocus="this.dataset.orig=this.textContent.trim()">${safeVal}</td>`;
       } else {
-        h += `<td>${v}</td>`;
+        const safeText = String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        h += `<td>${safeText}</td>`;
       }
     });
     h += "</tr>";
