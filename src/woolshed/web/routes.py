@@ -226,6 +226,7 @@ def create_app() -> Flask:
             lo, hi = quality_ranges[sub]
             if value == "" or value is None:
                 setattr(entity.quality, sub, None)
+            else:
                 try:
                     iv = int(value)
                 except (TypeError, ValueError):
