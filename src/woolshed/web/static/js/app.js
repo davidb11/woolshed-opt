@@ -209,17 +209,48 @@ function focusOn(id) {
 
 // Data tables.
 
-function makeTable(rows, columns) {
+function makeTable(rows, entityType, columns) {
   if (!rows.length) return "<p class='text-muted'>No data</p>";
   let h = "<table class='table table-sm table-striped table-bordered mb-0'><thead><tr>";
   columns.forEach(c => { h += `<th>${c.label}</th>`; });
   h += "</tr></thead><tbody>";
   rows.forEach(r => {
-    h += "<tr onclick=\"focusOn('" + r.id + "')\" style=\"cursor:pointer\">";
+    const id = String(r.id || "");
+    const safeId = id.replace(/['\\]/g, "\\$&");
+    const safeIdAttr = id.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    h += `<tr onclick="focusOn('${safeId}')" style="cursor:pointer">`;
     columns.forEach(c => {
       let v = c.get(r);
       if (v === null || v === undefined) v = "";
-      h += `<td>${v}</td>`;
+      if (c.qualityKey) {
+        // Discrete class dropdown — short label in select, full label as tooltip.
+        const opts = QUALITY[c.qualityKey] || {};
+        const shortLabel = lbl => lbl.split(" (")[0];
+        let sel = `<select class="tbl-quality-select" ` +
+                  `data-entity-type="${entityType}" data-id="${safeIdAttr}" data-field="quality.${c.qualityKey}" ` +
+                  `onclick="event.stopPropagation()">` +
+                  `<option value="">—</option>`;
+        Object.entries(opts).forEach(([k, label]) => {
+          sel += `<option value="${k}" title="${label}"${String(v) === k ? " selected" : ""}>${shortLabel(label)}</option>`;
+        });
+        sel += `</select>`;
+        h += `<td style="padding:1px 2px">${sel}</td>`;
+      } else if (c.editable) {
+        const safeVal = String(v)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;");
+        h += `<td class="tbl-edit" contenteditable="true" ` +
+             `data-entity-type="${entityType}" data-id="${safeIdAttr}" data-field="${c.field}" ` +
+             `onclick="event.stopPropagation()" ` +
+             `onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}` +
+                        `if(event.key==='Escape'){this.textContent=this.dataset.orig;this.blur()}" ` +
+             `onfocus="this.dataset.orig=this.textContent.trim()">${safeVal}</td>`;
+      } else {
+        const safeText = String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        h += `<td>${safeText}</td>`;
+      }
     });
     h += "</tr>";
   });
@@ -227,34 +258,106 @@ function makeTable(rows, columns) {
   return h;
 }
 
+async function patchEntity(type, id, field, value) {
+  const res = await fetch("/api/entity", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, id, field, value }),
+  });
+  const j = await res.json();
+  if (!res.ok) throw new Error(j.error || `Save failed (${res.status})`);
+  // Keep local DATA in sync so optimizer uses updated values.
+  const lists = { source: DATA.sources, process: DATA.processes, product: DATA.products };
+  const entity = (lists[type] || []).find(e => e.id === id);
+  if (entity) {
+    if (field.startsWith("quality.")) {
+      const sub = field.split(".")[1];
+      entity.quality = entity.quality || {};
+      entity.quality[sub] = value === "" ? null : parseInt(value, 10);
+      return;
+    }
+    const parsed = parseFloat(value);
+    entity[field] = Number.isFinite(parsed) ? parsed : value;
+    // If lat/lon changed, redraw markers and decorations.
+    if (field === "lat" || field === "lon") {
+      LOCATIONS[id] = [
+        field === "lat" ? parsed : entity.lat,
+        field === "lon" ? parsed : entity.lon,
+      ];
+      drawMarkers();
+      _renderDecorations();
+    }
+  }
+}
+
+// Delegated change handler for quality class dropdowns.
+document.addEventListener("change", async (e) => {
+  const sel = e.target;
+  if (!sel.classList.contains("tbl-quality-select")) return;
+  const { entityType, id, field } = sel.dataset;
+  const td = sel.closest("td");
+  try {
+    await patchEntity(entityType, id, field, sel.value);
+    if (td) { td.classList.add("tbl-edit-saved"); setTimeout(() => td.classList.remove("tbl-edit-saved"), 900); }
+    // Local DATA state is updated inside patchEntity().
+  } catch (err) {
+    if (td) { td.classList.add("tbl-edit-error"); setTimeout(() => td.classList.remove("tbl-edit-error"), 1800); }
+    showToast(err.message, "Save error", "danger");
+  }
+});
+
+// Delegated focusout handler for all editable table cells.
+document.addEventListener("focusout", async (e) => {
+  const td = e.target;
+  if (!td.classList.contains("tbl-edit")) return;
+
+  const newVal = td.textContent.trim();
+  const origVal = td.dataset.orig ?? newVal;
+  if (newVal === origVal) return; // unchanged
+
+  const { entityType, id, field } = td.dataset;
+  try {
+    await patchEntity(entityType, id, field, newVal);
+    td.classList.add("tbl-edit-saved");
+    setTimeout(() => td.classList.remove("tbl-edit-saved"), 900);
+  } catch (err) {
+    td.textContent = origVal; // revert
+    td.classList.add("tbl-edit-error");
+    setTimeout(() => td.classList.remove("tbl-edit-error"), 1800);
+    showToast(err.message, "Save error", "danger");
+  }
+});
+
 function drawTables() {
-  document.getElementById("tbl-sources").innerHTML = makeTable(DATA.sources, [
-    { label: "ID", get: r => r.id },
-    { label: "Name", get: r => r.name },
-    { label: "Qty (kg)", get: r => r.quantity_kg },
-    { label: "€/kg", get: r => r.cost_per_kg },
-    { label: "Impact", get: r => r.impact_per_kg },
-    { label: "Fine.", get: r => r.quality?.fineness ?? "" },
-    { label: "Col.", get: r => r.quality?.color ?? "" },
-    { label: "Staple", get: r => r.quality?.staple_length ?? "" },
-    { label: "Scour", get: r => r.quality?.scouring_yield ?? "" },
+  document.getElementById("tbl-sources").innerHTML = makeTable(DATA.sources, "source", [
+    { label: "ID",      get: r => r.id },
+    { label: "Name",    get: r => r.name,          editable: true, field: "name" },
+    { label: "Qty (kg)",get: r => r.quantity_kg,   editable: true, field: "quantity_kg" },
+    { label: "€/kg",   get: r => r.cost_per_kg,   editable: true, field: "cost_per_kg" },
+    { label: "Impact",  get: r => r.impact_per_kg, editable: true, field: "impact_per_kg" },
+    { label: "Fine.",   get: r => r.quality?.fineness ?? "",       qualityKey: "fineness" },
+    { label: "Col.",    get: r => r.quality?.color ?? "",           qualityKey: "color" },
+    { label: "Staple",  get: r => r.quality?.staple_length ?? "",   qualityKey: "staple_length" },
+    { label: "Scour",   get: r => r.quality?.scouring_yield ?? "",  qualityKey: "scouring_yield" },
   ]);
-  document.getElementById("tbl-processes").innerHTML = makeTable(DATA.processes, [
-    { label: "ID", get: r => r.id },
-    { label: "Name", get: r => r.name },
+  document.getElementById("tbl-processes").innerHTML = makeTable(DATA.processes, "process", [
+    { label: "ID",    get: r => r.id },
+    { label: "Name",  get: r => r.name,          editable: true, field: "name" },
     { label: "Stage", get: r => r.stage },
     { label: "Chain", get: r => r.chain },
-    { label: "Conv%", get: r => r.conversion_pct },
-    { label: "Cap", get: r => r.max_capacity_kg >= 1e8 ? "∞" : r.max_capacity_kg },
-    { label: "€/kg", get: r => r.cost_per_kg },
-    { label: "Imp", get: r => r.impact_per_kg },
+    { label: "Conv%", get: r => r.conversion_pct,   editable: true, field: "conversion_pct" },
+    { label: "Cap",   get: r => r.max_capacity_kg >= 1e8 ? "∞" : r.max_capacity_kg,
+                      editable: true, field: "max_capacity_kg" },
+    { label: "€/kg",  get: r => r.cost_per_kg,      editable: true, field: "cost_per_kg" },
+    { label: "Imp",   get: r => r.impact_per_kg,    editable: true, field: "impact_per_kg" },
   ]);
-  document.getElementById("tbl-products").innerHTML = makeTable(DATA.products, [
-    { label: "ID", get: r => r.id },
-    { label: "Name", get: r => r.name },
-    { label: "Min kg", get: r => r.demand_min_kg },
-    { label: "Max kg", get: r => r.demand_max_kg >= 1e8 ? "∞" : r.demand_max_kg },
-    { label: "€/kg", get: r => r.price_per_kg },
+  document.getElementById("tbl-products").innerHTML = makeTable(DATA.products, "product", [
+    { label: "ID",     get: r => r.id },
+    { label: "Name",   get: r => r.name,          editable: true, field: "name" },
+    { label: "Min kg", get: r => r.demand_min_kg, editable: true, field: "demand_min_kg" },
+    { label: "Max kg", get: r => r.demand_max_kg >= 1e8 ? "∞" : r.demand_max_kg,
+                       editable: true, field: "demand_max_kg" },
+    { label: "€/kg",  get: r => r.price_per_kg,  editable: true, field: "price_per_kg" },
   ]);
 }
 
@@ -423,6 +526,59 @@ document.getElementById("btn-optimize").addEventListener("click", async () => {
     hideSpinner();
   }
 });
+
+// Sidebar resize and collapse.
+(function () {
+  const sidebarEl = document.getElementById("sidebar");
+  const edgeEl    = document.getElementById("sidebar-edge");
+  const toggleBtn = document.getElementById("sidebar-toggle-btn");
+
+  let _width     = sidebarEl.offsetWidth || 300;
+  let _resizing  = false;
+  let _collapsed = false;
+
+  edgeEl.addEventListener("mousedown", (e) => {
+    if (e.target === toggleBtn) return;
+    _resizing = true;
+    document.body.style.cursor    = "col-resize";
+    document.body.style.userSelect = "none";
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!_resizing) return;
+    const left = edgeEl.parentElement.getBoundingClientRect().left;
+    const w = Math.max(500, Math.min(650, e.clientX - left));
+    sidebarEl.style.width = w + "px";
+    _width = w;
+    map.invalidateSize();
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (!_resizing) return;
+    _resizing = false;
+    document.body.style.cursor    = "";
+    document.body.style.userSelect = "";
+  });
+
+  toggleBtn.addEventListener("click", () => {
+    _collapsed = !_collapsed;
+    if (_collapsed) {
+      sidebarEl.style.width    = "0";
+      sidebarEl.style.padding  = "0";
+      sidebarEl.style.overflow = "hidden";
+      toggleBtn.textContent    = "›";
+      toggleBtn.title          = "Show panel";
+    } else {
+      sidebarEl.style.width    = _width + "px";
+      sidebarEl.style.padding  = "";
+      sidebarEl.style.overflow = "";
+      toggleBtn.textContent    = "‹";
+      toggleBtn.title          = "Hide panel";
+    }
+    map.invalidateSize();
+  });
+}());
 
 // Start the app.
 

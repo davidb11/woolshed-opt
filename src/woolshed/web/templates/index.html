@@ -35,10 +35,10 @@
 
   <!-- Main layout -->
   <div class="container-fluid main-container">
-    <div class="row h-100">
+    <div class="d-flex h-100">
 
       <!-- Sidebar with controls and data tables -->
-      <div id="sidebar" class="col-md-4 col-lg-3 sidebar">
+      <div id="sidebar" class="sidebar" style="width:500px;flex-shrink:0;">
         <!-- Optimiser controls -->
         <div class="card mb-2">
           <div class="card-body p-2">
@@ -92,8 +92,13 @@
         </div>
       </div>
 
+      <!-- Drag handle + collapse toggle -->
+      <div id="sidebar-edge">
+        <button id="sidebar-toggle-btn" title="Hide panel">‹</button>
+      </div>
+
       <!-- Map -->
-      <div class="col-md-8 col-lg-9 p-0">
+      <div style="flex:1;min-width:0;position:relative;">
         <div id="map"></div>
       </div>
     </div>
