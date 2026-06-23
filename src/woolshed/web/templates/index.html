@@ -17,17 +17,17 @@
   <!-- Navbar -->
   <nav class="navbar navbar-dark bg-dark px-3">
     <span class="navbar-brand mb-0 h1">
-      🐑 WoolShed – Wool Value-Chain Optimiser
+      🐑 WoolShed<span class="d-none d-md-inline"> – Wool Value-Chain Optimiser</span>
     </span>
-    <div class="d-flex gap-2">
-      <button id="btn-sample" class="btn btn-outline-light btn-sm" title="Load built-in sample data">
-        Load Sample Data
+    <div class="d-flex gap-2 flex-shrink-0">
+      <button id="btn-sample" class="btn btn-outline-light btn-sm text-nowrap" title="Load built-in sample data">
+        <span class="d-none d-sm-inline">Load </span>Sample
       </button>
-      <button id="btn-download-sample" class="btn btn-outline-light btn-sm" title="Download sample Excel template">
-        ⬇ Download Template
+      <button id="btn-download-sample" class="btn btn-outline-light btn-sm text-nowrap" title="Download sample Excel template">
+        ⬇<span class="d-none d-sm-inline"> Template</span>
       </button>
-      <label class="btn btn-outline-success btn-sm mb-0">
-        📂 Upload Excel
+      <label class="btn btn-outline-success btn-sm mb-0 text-nowrap">
+        📂<span class="d-none d-sm-inline"> Upload</span>
         <input id="file-upload" type="file" accept=".xlsx,.xls" hidden />
       </label>
     </div>
@@ -101,6 +101,8 @@
       <!-- Map -->
       <div style="flex:1;min-width:0;position:relative;">
         <div id="map"></div>
+        <!-- Mobile-only button to open the sidebar panel -->
+        <button id="mobile-panel-btn" title="Show panel">&#9776; Panel</button>
       </div>
     </div>
   </div>
@@ -113,6 +115,9 @@
     <span class="legend-dot" style="background:#4CAF50"></span> Product<br/>
     <span class="legend-line"></span> Optimised Flow
   </div>
+
+  <!-- Mobile sidebar backdrop -->
+  <div id="sidebar-backdrop"></div>
 
   <!-- Toast notifications -->
   <div class="position-fixed top-0 end-0 p-3" style="z-index:1080;">
