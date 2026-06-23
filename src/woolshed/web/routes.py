@@ -234,6 +234,10 @@ def create_app() -> Flask:
                 value = float(value)
             except (TypeError, ValueError):
                 return jsonify(error=f"Expected a number for '{field}'"), 400
+            if field == "lat" and not (-90.0 <= value <= 90.0):
+                return jsonify(error="Latitude must be between -90 and 90"), 400
+            if field == "lon" and not (-180.0 <= value <= 180.0):
+                return jsonify(error="Longitude must be between -180 and 180"), 400
             setattr(entity, field, value)
         elif field in string_fields:
             value = str(value).strip()
