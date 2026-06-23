@@ -217,6 +217,11 @@ def create_app() -> Flask:
         }
 
         if field in quality_fields:
+            if not hasattr(entity, "quality") or entity.quality is None:
+                return (
+                    jsonify(error=f"Field '{field}' is not editable for entity type '{entity_type}'"),
+                    400,
+                )
             sub = field.split(".")[1]
             lo, hi = quality_ranges[sub]
             if value == "" or value is None:
@@ -234,6 +239,13 @@ def create_app() -> Flask:
                 value = float(value)
             except (TypeError, ValueError):
                 return jsonify(error=f"Expected a number for '{field}'"), 400
+            import math
+            if not math.isfinite(value):
+                return jsonify(error=f"Expected a finite number for '{field}'"), 400
+            if field == "lat" and not (-90.0 <= value <= 90.0):
+                return jsonify(error="Latitude must be between -90 and 90"), 400
+            if field == "lon" and not (-180.0 <= value <= 180.0):
+                return jsonify(error="Longitude must be between -180 and 180"), 400
             setattr(entity, field, value)
         elif field in string_fields:
             value = str(value).strip()

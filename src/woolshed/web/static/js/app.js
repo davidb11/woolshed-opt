@@ -143,7 +143,8 @@ function drawMarkers() {
   techLayer.clearLayers();
   productLayer.clearLayers();
   flowLayer.clearLayers();
-  jitterLayer.clearLayers();
+  decorLayer.clearLayers();
+  _flows = [];
   LOC_MARKERS = {};
 
   // Group entities by coordinate; co-located ones get a small circular offset
@@ -238,7 +239,9 @@ function makeTable(rows, entityType, columns) {
   columns.forEach(c => { h += `<th>${c.label}</th>`; });
   h += "</tr></thead><tbody>";
   rows.forEach(r => {
-    const safeId = (r.id || "").replace(/'/g, "\\'");
+    const id = String(r.id || "");
+    const safeId = id.replace(/['\\]/g, "\\$&");
+    const safeIdAttr = id.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     h += `<tr onclick="focusOn('${safeId}')" style="cursor:pointer">`;
     columns.forEach(c => {
       let v = c.get(r);
@@ -248,7 +251,7 @@ function makeTable(rows, entityType, columns) {
         const opts = QUALITY[c.qualityKey] || {};
         const shortLabel = lbl => lbl.split(" (")[0];
         let sel = `<select class="tbl-quality-select" ` +
-                  `data-entity-type="${entityType}" data-id="${safeId}" data-field="quality.${c.qualityKey}" ` +
+                  `data-entity-type="${entityType}" data-id="${safeIdAttr}" data-field="quality.${c.qualityKey}" ` +
                   `onclick="event.stopPropagation()">` +
                   `<option value="">—</option>`;
         Object.entries(opts).forEach(([k, label]) => {
@@ -257,15 +260,20 @@ function makeTable(rows, entityType, columns) {
         sel += `</select>`;
         h += `<td style="padding:1px 2px">${sel}</td>`;
       } else if (c.editable) {
-        const safeVal = String(v).replace(/"/g, "&quot;").replace(/</g, "&lt;");
+        const safeVal = String(v)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;");
         h += `<td class="tbl-edit" contenteditable="true" ` +
-             `data-entity-type="${entityType}" data-id="${safeId}" data-field="${c.field}" ` +
+             `data-entity-type="${entityType}" data-id="${safeIdAttr}" data-field="${c.field}" ` +
              `onclick="event.stopPropagation()" ` +
              `onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}` +
                         `if(event.key==='Escape'){this.textContent=this.dataset.orig;this.blur()}" ` +
              `onfocus="this.dataset.orig=this.textContent.trim()">${safeVal}</td>`;
       } else {
-        h += `<td>${v}</td>`;
+        const safeText = String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        h += `<td>${safeText}</td>`;
       }
     });
     h += "</tr>";
@@ -286,8 +294,14 @@ async function patchEntity(type, id, field, value) {
   const lists = { source: DATA.sources, process: DATA.processes, product: DATA.products };
   const entity = (lists[type] || []).find(e => e.id === id);
   if (entity) {
+    if (field.startsWith("quality.")) {
+      const sub = field.split(".")[1];
+      entity.quality = entity.quality || {};
+      entity.quality[sub] = value === "" ? null : parseInt(value, 10);
+      return;
+    }
     const parsed = parseFloat(value);
-    entity[field] = isNaN(parsed) ? value : parsed;
+    entity[field] = Number.isFinite(parsed) ? parsed : value;
     // If lat/lon changed, redraw markers and decorations.
     if (field === "lat" || field === "lon") {
       LOCATIONS[id] = [
@@ -309,11 +323,7 @@ document.addEventListener("change", async (e) => {
   try {
     await patchEntity(entityType, id, field, sel.value);
     if (td) { td.classList.add("tbl-edit-saved"); setTimeout(() => td.classList.remove("tbl-edit-saved"), 900); }
-    // Keep local DATA in sync.
-    const sub = field.split(".")[1];
-    const lists = { source: DATA.sources, process: DATA.processes, product: DATA.products };
-    const entity = (lists[entityType] || []).find(e2 => e2.id === id);
-    if (entity && entity.quality) entity.quality[sub] = sel.value === "" ? null : parseInt(sel.value, 10);
+    // Local DATA state is updated inside patchEntity().
   } catch (err) {
     if (td) { td.classList.add("tbl-edit-error"); setTimeout(() => td.classList.remove("tbl-edit-error"), 1800); }
     showToast(err.message, "Save error", "danger");
