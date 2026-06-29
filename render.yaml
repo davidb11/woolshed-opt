@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: woolshed-opt
+    runtime: python
+    buildCommand: pip install -e .
+    startCommand: gunicorn "woolshed.web:create_app()" --bind 0.0.0.0:$PORT --workers 2
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
