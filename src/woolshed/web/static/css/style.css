@@ -8,7 +8,8 @@ html, body {
 }
 
 .main-container {
-  height: calc(100vh - 56px);   /* Space below the navbar. */
+  height: calc(100vh - 56px);
+  height: calc(100svh - 56px); /* svh: stable on mobile (ignores browser chrome resize) */
 }
 
 .sidebar {
@@ -19,6 +20,14 @@ html, body {
   background: #f8f9fa;
   padding: 0.5rem;
   min-width: 0;
+}
+
+/* Card and tabs must paint above the tab-content scroll container. */
+.sidebar > .card,
+.sidebar > #dataTabs {
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
 }
 
 /* Drag-resize edge. */
@@ -74,13 +83,11 @@ html, body {
 
 .table-responsive table {
   font-size: 0.78rem;
+  white-space: nowrap; /* prevent cell wrapping — horizontal scroll handles overflow */
 }
 
 .table-responsive th {
-  position: sticky;
-  top: 0;
   background: #e9ecef;
-  z-index: 1;
 }
 
 /* Map legend. */
@@ -162,19 +169,98 @@ html, body {
   box-shadow: 0 0 0 2px rgba(13,110,253,0.2);
 }
 
-/* Sidebar scrollbar. */
-.sidebar ::-webkit-scrollbar { width: 6px; }
-.sidebar ::-webkit-scrollbar-thumb { background: #adb5bd; border-radius: 3px; }
+/* Hide vertical scrollbars on sidebar containers — tables keep their horizontal slider. */
+.sidebar, .tab-content, #dataTabs {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.sidebar::-webkit-scrollbar,
+.tab-content::-webkit-scrollbar,
+#dataTabs::-webkit-scrollbar { display: none; }
 
 /* Flow results table. */
+.flow-table-scroll { overflow-x: auto; }
+.flow-table-scroll table { white-space: nowrap; }
 #flow-table .table { font-size: 0.78rem; }
-#flow-table thead th {
-  position: sticky;
-  top: 0;
-  background: #e9ecef;
-  z-index: 1;
-}
+#flow-table thead th { background: #e9ecef; }
 .flow-row.flow-highlight { background: rgba(255, 111, 0, 0.12) !important; }
+
+/* Mobile panel open button (map overlay, hidden on desktop). */
+#mobile-panel-btn {
+  display: none;
+  position: absolute;
+  top: 80px;
+  left: 10px;
+  z-index: 1002;
+  background: #343a40;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+#mobile-panel-btn:hover { background: #495057; }
+
+/* Sidebar backdrop (mobile only). */
+#sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 1049;
+}
+#sidebar-backdrop.active { display: block; }
+
+/* Tabs: never wrap — scroll horizontally if needed.
+   position+z-index forces nav tabs above tab-content's stacking context. */
+#dataTabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  z-index: 10;
+}
+#dataTabs .nav-link {
+  white-space: nowrap;
+}
+
+/* ── Mobile breakpoint (< 768 px) ── */
+@media (max-width: 767.98px) {
+  /* Sidebar becomes a fixed overlay sliding in from the left.
+     height: auto lets top+bottom set the height (overrides .sidebar height: 100%). */
+  #sidebar {
+    position: fixed !important;
+    top: 56px;
+    left: 0;
+    bottom: 0;
+    height: auto !important;
+    width: min(85vw, 360px) !important;
+    z-index: 1050;
+    transform: translateX(-110%);
+    transition: transform 0.25s ease;
+    overflow: hidden; /* inner flex handles scrolling */
+  }
+  #sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  /* Hide the desktop drag edge on mobile. */
+  #sidebar-edge { display: none; }
+
+  /* Show the floating map button. */
+  #mobile-panel-btn { display: block; }
+
+  /* Legend: smaller and raised above mobile browser chrome. */
+  #legend {
+    font-size: 0.72rem;
+    padding: 6px 10px;
+    bottom: 56px;
+    right: 8px;
+    line-height: 1.5;
+  }
+}
 
 /* Loading spinner. */
 .spinner-overlay {
