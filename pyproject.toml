@@ -15,6 +15,7 @@ dependencies = [
     "Flask>=3.0",
     "openpyxl>=3.1",
     "PuLP>=2.7",
+    "gunicorn>=21.2",
 ]
 
 [project.optional-dependencies]
